@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Neural Network Size Visualizer</title>
+    <style>
+        html, body {
+            overflow-x: hidden;
+            overflow-y: hidden;
+        }
+        
+        .canvas-container {
+            border: 1px solid #ccc;
+            margin-top: 8px;
+            overflow-x: scroll;
+            overflow-y: scroll;
+            position: relative;
+            height: 85vh;
+            box-sizing: border-box; 
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+            border: 3px solid aliceblue;
+        }
+    </style>
+</head>
+<body>
+    
+    <span class="input-group">
+        <label for="input_size">Input Size:</label>
+        <input type="range" id="input_size_r" name="input_size" min="1" max="100" required>
+        <input type="number" id="input_size" value="5" style="width: 3rem;">
+    </span>
+
+    <span class="input-group">
+        <label for="max_iterations">Max Iterations:</label>
+        <input type="range" id="max_iterations_r" name="max_iterations" min="1" max="100" required>
+        <input type="number" id="max_iterations" value="15" style="width: 3rem;">
+    </span>
+
+    <span class="input-group">
+        <label for="net_scale">Zoom:</label>
+        <input type="range" id="net_scale_r" name="net_scale_r" step="0.001" max="5" required>
+        <input type="number" id="net_scale" step="0.01" value="1" style="width: 4rem;">
+        <label for="auto_fit">Auto-fit:</label>
+        <input type="checkbox" id="auto_fit" name="auto_fit" checked>
+    </span>
+
+    <button type="submit" onclick="simulate()">Simulate</button>
+
+    <br />
+
+    <span class="input-group">
+        <label for="in_factor">In Factor:</label>
+        <input type="range" id="in_factor_r" name="in_factor" step="0.00001" min="0.00001" max="2.5" required>
+        <input type="number" id="in_factor" step="0.001" value="1.5" style="width: 7rem;">
+    </span>
+
+    <span class="input-group">
+        <label for="out_factor">Out Factor:</label>
+        <input type="range" id="out_factor_r" name="out_factor" step="0.00001" min="0.00001" max="1" required>
+        <input type="number" id="out_factor" step="0.001" value="0.3" style="width: 7rem;">
+    </span>
+
+    <br />
+
+    <span class="input-group">
+        <label for="circle_size">Circle Size:</label>
+        <input type="range" id="circle_size_r" name="circle_size_r" min="1" required>
+        <input type="number" id="circle_size" value="25" style="width: 2rem;">
+    </span>
+
+    <span class="input-group">
+        <label for="x_gap">x Gap:</label>
+        <input type="range" id="x_gap_r" name="x_gap_r" min="0" required>
+        <input type="number" id="x_gap" value="0" style="width: 2rem;">
+    </span>
+
+    <span class="input-group">
+        <label for="y_gap">y Gap:</label>
+        <input type="range" id="y_gap_r" name="y_gap_r" min="0" style="width: 5rem;" required>
+        <input type="number" id="y_gap" value="0" style="width: 2rem;">
+    </span>
+    
+    <span class="input-group">
+        <label for="dbg_layer">Dbg Layer:</label>
+        <input type="range" id="dbg_layer_r" name="dbg_layer_r" min="-1" style="width: 5rem;" required>
+        <input type="number" id="dbg_layer" value="-1" style="width: 2rem;">
+    </span>
+
+    <span class="input-group">
+        <label for="dbg_neuron">Dbg Neuron:</label>
+        <input type="range" id="dbg_neuron_r" name="dbg_neuron_r" min="-1" style="width: 5rem;" required>
+        <input type="number" id="dbg_neuron" value="-1" style="width: 2rem;">
+        <label for="dbg_mid_neuron">Middle:</label>
+        <input type="checkbox" id="dbg_mid_neuron" name="dbg_mid_neuron">
+    </span>
+    
+    <div class="canvas-container">
+        <canvas id="sizes_canvas"></canvas>
+    </div>
+    
+    <script>
+
+        let toolElem = {
+            make: function (srcElem, toolName) {
+                let tooledElem = (this.isTool(srcElem)) ? srcElem : undefined;
+
+                if (! tooledElem) {
+                    if (! this.isElem(srcElem)) {
+                        switch(typeof srcElem) {
+                            case "string":
+                                srcElem = document.getElementById(srcElem);
+                                break;
+                        };
+                    };
+
+                    if (srcElem) {
+                        tooledElem = Object.create(this, {"srcElem": {"value": srcElem}, "toolName": {"value": toolName}});
+                    };
+                };
+
+                return tooledElem;
+            },
+            listen: function (event, eventFunc) {
+                if (this.srcElem && event && eventFunc) {
+                    this.srcElem.addEventListener(event, eventFunc);
+                };
+
+                return this;
+            },
+            isElem: function (target) {
+                return (target && typeof target === "object" && target.nodeName !== undefined);
+            },
+            isInput: function (target) {
+                return (this.isElem(target) && target.nodeName === "INPUT");
+            },
+            isTool: function (target) {
+                return (this.isElem(target) && target.srcElem !== undefined);
+            },
+            get: function () {
+                let val;
+
+                switch(this.srcElem.type) {
+
+                    case "checkbox":
+                        val = this.srcElem.checked;
+                        break;
+                    
+                    case "number":
+                        val = this.srcElem.valueAsNumber;
+                        break;
+
+                    default:
+                        val = this.srcElem.value;
+                        break;
+                    
+                };
+
+                return val
+            },
+            set: function (newValue) {
+                switch(this.srcElem.type) {
+
+                    case "checkbox":
+                        switch(typeof newValue) {
+
+                            case "number":
+                                newValue = (newValue !== 0);
+                                break;
+
+                            case "string":
+                                newValue = (newValue === "on" || newValue.trim() !== "");
+
+                        };
+                        
+                        return this.srcElem.checked = Boolean(newValue);
+                        break;
+                    
+                    case "number":
+                        return this.srcElem.valueAsNumber = Number(newValue);
+                    
+                    default:
+                        return this.srcElem.value = newValue.toString();
+                        break;
+
+                };       
+            },
+            share: function (target) {
+                // Set the value of one input to the value of another
+                if (! target) target = this.srcElem.id+"_r" //default to range input
+                noway = (typeof noway === "undefined") ? 1 : noway + 1;
+                if (target && (target = this.make(target))) {
+                    //Initialize target value
+                    target.set(this.get());
+
+                    
+                    this.listen("input", () => {target.set(this.get())});
+                    target.listen("input", () => {this.set(target.get())});
+                };
+                
+                return this;
+            },
+        };
+        
+        const canvas = document.getElementById('sizes_canvas');
+        const ctx = canvas.getContext('2d');
+        const wheelScale = 1.01;
+
+        function initTool(elem) {
+            let pair = toolElem.make(elem+"_r");
+            if (pair) pair.listen("input", () => {setTimeout(simulate, 1);});
+
+            return toolElem.make(elem).share().listen("input", () => {setTimeout(simulate, 1);});
+        };
+
+        inputSize = initTool("input_size");
+        maxIterations = initTool("max_iterations");
+        networkScale = initTool("net_scale");
+        autoFit = initTool("auto_fit");
+
+        inFactor = initTool("in_factor");
+        outFactor = initTool("out_factor");
+
+        circleSize = initTool("circle_size");
+        xGap = initTool("x_gap");
+        yGap = initTool("y_gap");
+
+        dbgLayer = initTool("dbg_layer");
+        dbgNeuron = initTool("dbg_neuron");
+        dbgMidNeuron = initTool("dbg_mid_neuron");
+        
+        let lastSizes = [];
+
+        window.addEventListener('resize', resizeCanvas);
+
+        canvas.addEventListener('wheel', function(event) {
+            if (event.ctrlKey && event.deltaY) {
+                // Zoom in/out on canvas
+                event.preventDefault();
+
+                autoFit.set(false);
+                
+                if (event.deltaY < 0) {
+                    networkScale.set(networkScale.get() * wheelScale);
+                } else {
+                    networkScale.set(networkScale.get() / wheelScale);
+                }
+
+                setTimeout(simulate, 1);
+            }
+        });
+
+        function resizeCanvas() {
+            canvas.width = Math.max(canvas.width, canvas.parentElement.clientWidth);
+            canvas.height = Math.max(canvas.height, canvas.parentElement.clientHeight);
+            simulate();
+        }
+
+        /***************************************************************************
+            Main - Simulate
+        ***************************************************************************/
+        function simulate() {
+            // Visualize the sizes of a neural network
+
+            function calcNetwork(layerSize) {
+                // Calculate the sizes of the layers
+                let lastIn = 0;
+                let iter = 0;
+                let sizes = [];
+
+                while (iter < maxIterations.get() && layerSize > 0) {
+                    sizes.push(layerSize);
+
+                    if (iter > 0 && layerSize < 2) break;
+                    
+                    // Alternate between In Factor and Out Factor
+                    if (iter % 2 === 0 && layerSize !== lastIn ) {
+                    //if (iter % 2 === 0) {
+                        if (iter > 0) lastIn = layerSize;
+                        layerSize *= inFactor.get();
+                    } else {
+                        layerSize *= outFactor.get();
+                    }
+
+                    layerSize = Math.max(1, Math.round(layerSize));
+
+                    iter ++;
+                };
+
+                return sizes;
+            }
+
+            function drawLine(x1, y1, x2, y2, style="gray") {
+                // Draw line in canvas
+                ctx.beginPath();
+                ctx.strokeStyle = style;
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+
+            function drawCircle(x, y, radius, color) {
+                // Draw circle in canvas
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+            }
+
+            function getColorHSL(hue, saturation, lightness) {
+                // Return HSL color for canvas
+                return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+            }
+
+            function getLayerHue(index, total) {
+                // Circle color based on index
+                return 120 + (index * 30) % 360;
+            }
+
+            function getLayerColor(index, size) {
+                // Get the color of the layer
+                const hue = 120 + (size * 30) % 360;
+                const lightness = index % 2 === 0 ? 50 : 30;
+                return getColorHSL(hue, 70, lightness);
+            }
+
+            function getLayerHeight(num, size, gap) {
+                // Calculate the height of the layer
+                return (num * (size + gap)) - gap;
+            }
+
+            function isMiddleNeuron(pos, midPos1, midPos2) {
+                // Check if the neuron is in the middle
+                return (pos >= midPos1 && pos <= midPos2);
+            }
+
+            
+            /*******************************************************
+               Begin simulation
+            *******************************************************/
+            let sizes = calcNetwork(inputSize.get());
+
+            if (sizes.length === 0) {
+                //No sizes returned, clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                return;
+            } else if (sizes === lastSizes) {
+                //Sizes are the same, no need to redraw
+                return;
+            }
+
+            //Save sizes for comparison with next call
+            lastSizes = sizes;
+
+            // Set canvas size based on the number of iterations
+            const maxSize = Math.max(...sizes);
+
+            let scaleCircle = circleSize.get();
+            let scaleXGap = xGap.get();
+            let scaleYGap = yGap.get();
+            let xMargin = 15;
+            let yMargin = 15;
+            let maxWidth = canvas.parentElement.clientWidth - (xMargin * 2);
+            let maxHeight = canvas.parentElement.clientHeight - (yMargin * 2);
+
+            // Calculate the maximum height of the layers, the pre-margin height
+            let reqHeight = getLayerHeight(maxSize, scaleCircle, scaleYGap);
+            reqHeight += getLayerHeight(2, scaleCircle, 0); // Add top and bottom labels
+
+            const canvasWidth = (sizes.length * (scaleCircle + (scaleXGap / 2)));// + (xMargin * 2));
+            const canvasHeight = reqHeight;// + (yMargin * 2);
+            
+            let scaleFactor = networkScale.get();
+
+            if (autoFit.get()) {
+                // Auto-fit the canvas
+                
+                scaleFactor = Math.min(maxWidth / canvasWidth, maxHeight / canvasHeight);
+                networkScale.set(scaleFactor);
+                
+                //cScale(canvas.parentElement.clientHeight / canvasHeight, false);
+            }
+
+            //xMargin *= scaleFactor;
+            //yMargin *= scaleFactor;
+            let scaledWidth = canvasWidth * scaleFactor;
+            let scaledHeight = canvasHeight * scaleFactor;
+
+            let yCenter = (scaledHeight / 2) + yMargin;
+
+            scaleCircle *= scaleFactor;
+            const circleRad = scaleCircle / 2;
+
+            scaleXGap *= scaleFactor;
+            scaleYGap *= scaleFactor;
+
+            //canvas.width = Math.max(canvasWidth * networkScale.get(), canvas.parentElement.clientWidth);
+            //canvas.height = Math.max(canvasHeight * networkScale.get(), canvas.parentElement.clientHeight);
+
+            // Reset the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            //ctx.scale(networkScale, networkScale);
+
+            if (dbgMidNeuron.get()) {
+                // Draw horizontal center line
+                drawLine(xMargin, yCenter, scaledWidth, yCenter, "gray");
+                
+                // Debug lines
+                drawLine(xMargin, yCenter - circleRad - (scaleYGap / 2), canvas.width, yCenter - circleRad - (scaleYGap / 2), "yellow");
+                drawLine(xMargin, yCenter + circleRad + (scaleYGap / 2), canvas.width, yCenter + circleRad + (scaleYGap / 2), "yellow");
+
+                drawLine(xMargin, yMargin, scaledWidth, yMargin, "blue");
+                drawLine(xMargin, yMargin + scaledHeight, scaledWidth, yMargin + scaledHeight, "blue");
+            };
+
+            // Draw the layers
+            let xPosition = xMargin + circleRad;
+            let yPosition = yMargin;
+
+            sizes.forEach((num, index) => {
+                let layerHeight = getLayerHeight(num, scaleCircle, scaleYGap);
+                let yPosition = yCenter - (layerHeight / 2) - (circleRad + scaleYGap); // Starting position, center the stack vertically
+                
+                if (index == dbgLayer.get()) {
+                    // Draw horizontal center line of circle
+                    drawLine(xPosition - scaleCircle, yPosition, xPosition + scaleCircle, yPosition, "purple");
+                    
+                    // Draw horizontal margin line
+                    drawLine(xPosition - scaleCircle, yPosition - yMargin, xPosition + scaleCircle, yPosition - yMargin, "green");
+                }
+
+                if (index == dbgLayer.get()) drawLine(xPosition - scaleCircle, yPosition, xPosition + scaleCircle, yPosition, "red");
+
+                // Add top label
+                ctx.fillStyle = 'black';
+                ctx.font = '12px Arial';
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(num, xPosition, yPosition + scaleYGap);
+                
+                let layerColor = getLayerColor(index, num);
+                let middleNeuron = Math.trunc(num / 2);
+
+                // Draw the neurons
+                for (let i = 0; i < num; i++) {
+                    let colorHSL;
+
+                    yPosition += scaleCircle + scaleYGap; // Get next position, center of circle
+                    bIsMidNeuron = isMiddleNeuron(yPosition, (yCenter - circleRad - (scaleYGap / 2)) - 2, (yCenter + circleRad + (scaleYGap / 2)) + 2);
+
+                    // Make the middle node a different color
+                    if (bIsMidNeuron) {
+                        colorHSL = getLayerColor(index - 1, num);
+                    } else {
+                        colorHSL = layerColor;
+                    }
+                    
+                    // Draw circle
+                    drawCircle(xPosition, yPosition, circleRad, colorHSL);
+
+                    if (index == dbgLayer.get() || i == dbgNeuron.get() || (dbgMidNeuron.get() && bIsMidNeuron)) drawLine(xPosition - scaleCircle, yPosition, xPosition + scaleCircle, yPosition, "red");
+                }
+
+                yPosition += scaleCircle; // Add space for bottom label
+                if (index == dbgLayer.get()) drawLine(xPosition, yPosition, xPosition + scaleCircle, yPosition, "red");
+
+                // Add bottom label
+                ctx.fillStyle = 'black';
+                ctx.font = '12px Arial';
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(num, xPosition, yPosition);
+
+                xPosition += scaleCircle + (scaleXGap / 2);
+            });
+
+            ctx.restore();
+        }
+
+        // Run simulation when page loads
+        function initSim(timeout = 0) {
+            return setTimeout(resizeCanvas, timeout); // resizeCanvas makes call to simulate()
+        }
+
+
+        // Initial simulation
+        initSim(1);
+
+    </script>
+</body>
+</html>
