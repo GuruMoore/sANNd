@@ -27,7 +27,7 @@ class Mould:
         self.func = func or (lambda *x: x)  # Default: identity function
         self.train_func = train_func or (lambda grad, item, lr: item - lr * grad)
         self.length = length or max(len(it) for it in self.iterables)  # Match longest iterable
-        self.parent = parent  # Link to previous Mould in the chain
+        self.parent = parent or self.iterables[1] if len(self.iterables) > 1 and isinstance(self.iterables[1], Mould) else None # Link to previous Mould in the chain
         
         # Training parameters
         self.learning_rate = learning_rate
