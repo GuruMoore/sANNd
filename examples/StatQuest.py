@@ -1,4 +1,4 @@
-from mould import *
+from mould import Mould
 import math
 
 """
@@ -24,7 +24,7 @@ def softplus_derivative(x):
 
 # Bee - beep - boop - bee - boop
 input = [0.5] 
-hw = Mould([-34.4, -2.52], input, func=scale) # Weigths of connection from input to the hidden layer
+hw = Mould([-34.4, -2.52], input, func=scale) # Weights of connection from input to the hidden layer
 hb = Mould([2.14, 1.29], hw, func=add) # Biases of the Nodes in the hidden layer
 ha = Mould(hb, func=softplus) # Softplus activation
 
