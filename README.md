@@ -39,6 +39,27 @@ A **basic neural network** in sANNd is just a **chain of `Moulds`** that **modul
 Here’s how you can **define and train a simple model**:
 
 ```python
+import random
+import math
+from mould import Mould
+
+# Define activation functions
+def scale(x, y):
+    return x * y
+
+def add(x, y):
+    return x + y
+
+def softplus(x):
+    return math.log1p(math.exp(min(x, 50)))  # Prevent overflow
+
+# Gradient functions
+def compute_gradient(output, target):
+    return [(o - t) * 0.01 for o, t in zip(output, target)]  # Simple derivative
+
+def apply_gradient(grad, param, lr):
+    return param - lr * grad  # Learning rate-based update
+
 in_data = [0.5]  # Input data
 target_output = [1.0348]  # Target output
 
@@ -66,8 +87,10 @@ for epoch in range(2000):
     if epoch % 100 == 0:
         print(f"Epoch {epoch}, Output: {final_output}, Loss: {loss}")
 
+    if loss == 0: break
+
 # Final Prediction
-print(f"\n Final Output: {final_output}, Target: {target_output}")
+print(f"\n ({epoch}) Final Output: {final_output}, Target: {target_output}")
 ```
 🔥 **This is a fully functional trainable model—built without traditional layers!**  
 

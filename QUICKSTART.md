@@ -77,8 +77,10 @@ for epoch in range(2000):
     if epoch % 100 == 0:
         print(f"Epoch {epoch}, Output: {final_output}, Loss: {loss}")
 
+    if loss == 0: break
+    
 # Final Prediction
-print(f"\n Final Output: {final_output}, Target: {target_output}")
+print(f"\n ({epoch}) Final Output: {final_output}, Target: {target_output}")
 ```
 🔥 **A fully trainable network—no static layers, just flowing iterators!**
 
