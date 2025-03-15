@@ -103,7 +103,7 @@ class Mould:
                         new_values.append(item)
             
             new_iterables.append(new_values)
-            iter_idx ++ 1
+            iter_idx += 1
         
         self.iterables = new_iterables  # Store updated iterables
 
